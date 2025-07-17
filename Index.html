@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Счётчики</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com "></script>
+  <!-- React и ReactDOM -->
+  <script src="https://unpkg.com/react @18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom @18/umd/react-dom.development.js" crossorigin></script>
+  <!-- Babel для обработки JSX -->
+  <script src="https://unpkg.com/ @babel/standalone/babel.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 p-6 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('electricity');
+      const [currentDate, setCurrentDate] = useState(new Date());
+      const [electricity, setElectricity] = useState({});
+      const [bathroom, setBathroom] = useState({ cold: 0, hot: 0 });
+      const [kitchen, setKitchen] = useState({ cold: 0, hot: 0 });
+      const [toilet, setToilet] = useState({ cold: 0, hot: 0 });
+      const [history, setHistory] = useState({});
+      const [warning, setWarning] = useState(null);
+
+      useEffect(() => {
+        const sampleHistory = {
+          '2023-1': {
+            electricity: 230,
+            bathroom: { cold: 3.5, hot: 2.1 },
+            kitchen: { cold: 2.8, hot: 1.9 },
+            toilet: { cold: 4.2 },
+          },
+          '2023-2': {
+            electricity: 250,
+            bathroom: { cold: 3.8, hot: 2.3 },
+            kitchen: { cold: 3.1, hot: 2.0 },
+            toilet: { cold: 4.5 },
+          },
+        };
+        setHistory(sampleHistory);
+      }, []);
+
+      const handleElectricityChange = (e) => {
+        const value = parseFloat(e.target.value) || 0;
+        setElectricity((prev) => ({ ...prev, current: value }));
+      };
+
+      const handleWaterChange = (room, type, value) => {
+        const numValue = parseFloat(value) || 0;
+        if (room === 'bathroom') {
+          setBathroom((prev) => ({ ...prev, [type]: numValue }));
+        } else if (room === 'kitchen') {
+          setKitchen((prev) => ({ ...prev, [type]: numValue }));
+        } else if (room === 'toilet') {
+          setToilet((prev) => ({ ...prev, [type]: numValue }));
+        }
+      };
+
+      const calculateTotalWater = () => {
+        const coldTotal = bathroom.cold + kitchen.cold + toilet.cold;
+        const hotTotal = bathroom.hot + kitchen.hot;
+        return { coldTotal, hotTotal };
+      };
+
+      const saveData = () => {
+        const monthYear = `${currentDate.getFullYear()}-${currentDate.getMonth() + 1}`;
+        const totalWater = calculateTotalWater();
+
+        const lastMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
+        const lastMonthData = history[lastMonthKey];
+
+        if (lastMonthData) {
+          const expectedElectricity = lastMonthData.electricity + 20;
+          if (Math.abs(electricity.current - expectedElectricity) > 30) {
+            setWarning('Обнаружено значительное расхождение в показаниях электроэнергии!');
+          } else {
+            setWarning(null);
+          }
+        }
+
+        setHistory((prev) => ({
+          ...prev,
+          [monthYear]: {
+            electricity: electricity.current || 0,
+            bathroom: { ...bathroom },
+            kitchen: { ...kitchen },
+            toilet: { ...toilet },
+          },
+        }));
+
+        alert('Данные успешно сохранены!');
+      };
+
+      const getHistoryData = () => {
+        const monthYear = `${currentDate.getFullYear()}-${currentDate.getMonth() + 1}`;
+        return history[monthYear] || null;
+      };
+
+      const renderElectricityForm = () => {
+        const historyData = getHistoryData();
+        return (
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h3 className="text-xl font-semibold mb-4">Текущие показания</h3>
+              <div className="mb-4">
+                <label className="block text-gray-700 mb-2">Электроэнергия (кВт·ч)</label>
+                <input
+                  type="number"
+                  className="w-full p-2 border rounded"
+                  value={electricity.current || ''}
+                  onChange={handleElectricityChange}
+                  placeholder="Введите показания"
+                />
+              </div>
+            </div>
+
+            {historyData && (
+              <div className="bg-gray-50 p-6 rounded-lg shadow">
+                <h3 className="text-xl font-semibold mb-4">История за {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
+                <p>Электроэнергия: <span className="font-semibold">{historyData.electricity} кВт·ч</span></p>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      const renderWaterForm = () => {
+        const historyData = getHistoryData();
+        const totalWater = calculateTotalWater();
+        const coldDiff = historyData?.bathroom?.cold + historyData?.kitchen?.cold + historyData?.toilet?.cold;
+        const hotDiff = historyData?.bathroom?.hot + historyData?.kitchen?.hot;
+
+        useEffect(() => {
+          if (historyData) {
+            if (bathroom.cold > (historyData.bathroom.cold + 5) || 
+                kitchen.cold > (historyData.kitchen.cold + 5) ||
+                toilet.cold > (historyData.toilet.cold + 5)) {
+              setWarning('Обнаружено значительное увеличение потребления холодной воды!');
+            } else if (bathroom.hot > (historyData.bathroom.hot + 5) || 
+                       kitchen.hot > (historyData.kitchen.hot + 5)) {
+              setWarning('Обнаружено значительное увеличение потребления горячей воды!');
+            } else {
+              setWarning(null);
+            }
+          }
+        }, [bathroom, kitchen, toilet, historyData]);
+
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white p-6 rounded-lg shadow-md">
+                <h3 className="text-xl font-semibold mb-4">Ванная</h3>
+                <div className="mb-4">
+                  <label className="block text-gray-700 mb-2">Холодная вода (м³)</label>
+                  <input
+                    type="number"
+                    className="w-full p-2 border rounded text-blue-600"
+                    value={bathroom.cold}
+                    onChange={(e) => handleWaterChange('bathroom', 'cold', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-2">Горячая вода (м³)</label>
+                  <input
+                    type="number"
+                    className="w-full p-2 border rounded text-red-600"
+                    value={bathroom.hot}
+                    onChange={(e) => handleWaterChange('bathroom', 'hot', e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow-md">
+                <h3 className="text-xl font-semibold mb-4">Кухня</h3>
+                <div className="mb-4">
+                  <label className="block text-gray-700 mb-2">Холодная вода (м³)</label>
+                  <input
+                    type="number"
+                    className="w-full p-2 border rounded text-blue-600"
+                    value={kitchen.cold}
+                    onChange={(e) => handleWaterChange('kitchen', 'cold', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-2">Горячая вода (м³)</label>
+                  <input
+                    type="number"
+                    className="w-full p-2 border rounded text-red-600"
+                    value={kitchen.hot}
+                    onChange={(e) => handleWaterChange('kitchen', 'hot', e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow-md">
+                <h3 className="text-xl font-semibold mb-4">Туалет</h3>
+                <div className="mb-4">
+                  <label className="block text-gray-700 mb-2">Холодная вода (м³)</label>
+                  <input
+                    type="number"
+                    className="w-full p-2 border rounded text-blue-600"
+                    value={toilet.cold}
+                    onChange={(e) => handleWaterChange('toilet', 'cold', e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-6 rounded-lg shadow">
+              <h3 className="text-xl font-semibold mb-4">Итого</h3>
+              <p className="text-blue-600">Холодная вода: <span className="font-semibold">{totalWater.coldTotal.toFixed(2)} м³</span></p>
+              <p className="text-red-600">Горячая вода: <span className="font-semibold">{totalWater.hotTotal.toFixed(2)} м³</span></p>
+            </div>
+
+            {historyData && (
+              <div className="bg-gray-50 p-6 rounded-lg shadow">
+                <h3 className="text-xl font-semibold mb-4">История за {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
+                <p>Холодная вода: <span className="font-semibold">{coldDiff?.toFixed(2) || 0} м³</span></p>
+                <p>Горячая вода: <span className="font-semibold">{hotDiff?.toFixed(2) || 0} м³</span></p>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      return (
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-3xl font-bold text-center mb-8">Счётчики</h1>
+
+          <div className="flex border-b mb-6">
+            <button
+              className={`px-4 py-2 font-medium ${activeTab === 'electricity' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600'}`}
+              onClick={() => setActiveTab('electricity')}
+            >
+              Учёт электроэнергии
+            </button>
+            <button
+              className={`px-4 py-2 font-medium ${activeTab === 'water' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600'}`}
+              onClick={() => setActiveTab('water')}
+            >
+              Учёт воды
+            </button>
+          </div>
+
+          <div className="flex justify-between items-center mb-6">
+            <button
+              onClick={() => setCurrentDate(prev => {
+                const newDate = new Date(prev);
+                newDate.setMonth(newDate.getMonth() - 1);
+                return newDate;
+              })}
+              className="p-2 rounded-full hover:bg-gray-200"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+            <h2 className="text-xl font-semibold">
+              {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+            </h2>
+            <button
+              onClick={() => setCurrentDate(prev => {
+                const newDate = new Date(prev);
+                newDate.setMonth(newDate.getMonth() + 1);
+                return newDate;
+              })}
+              className="p-2 rounded-full hover:bg-gray-200"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </button>
+          </div>
+
+          {warning && (
+            <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6 rounded">
+              <p className="font-bold">Предупреждение</p>
+              <p>{warning}</p>
+            </div>
+          )}
+
+          {activeTab === 'electricity' ? renderElectricityForm() : renderWaterForm()}
+
+          <div className="mt-8">
+            <button
+              onClick={saveData}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded transition duration-200"
+            >
+              Сохранить показания
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
